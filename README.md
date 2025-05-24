@@ -20,3 +20,6 @@ The New Wave:
 https://claude.ai/public/artifacts/e5ba0ef7-ad72-412d-9091-c4f75d5d9fb3 
 
 who wins?
+
+
+www.worksonbecoming.com/on-becoming/2025/5/23/flusser-future-forward
