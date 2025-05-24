@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Eternal Haunted CRT</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            color: #0f0;
+        }
+
+        #crt {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 10px 20px;
+            font-family: monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: rgba(0,255,0,0.2);
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        #text-mode {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            color: #0f0;
+            padding: 50px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            display: none;
+            z-index: 200;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        .flusser { color: #ff0; font-style: italic; }
+        .user { color: #0ff; text-align: right; }
+        .system { color: #f0f; text-align: center; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <canvas id="crt"></canvas>
+    
+    <div id="info">
+        <div>CH <span id="channel">000</span></div>
+        <div>YEAR: <span id="year">1970</span></div>
+        <div>MODE: <span id="mode">CRT</span></div>
+    </div>
+    
+    <div id="controls">
+        <button onclick="changeChannel(1)">CHANNEL +</button>
+        <button onclick="changeChannel(-1)">CHANNEL -</button>
+        <button onclick="timeTravel(100)">FUTURE →</button>
+        <button onclick="timeTravel(-100)">← PAST</button>
+        <button onclick="toggleText()">TEXT/IMAGE</button>
+        <button onclick="degauss()">DEGAUSS</button>
+    </div>
+    
+    <div id="text-mode"></div>
+
+    <script>
+        const canvas = document.getElementById('crt');
+        const ctx = canvas.getContext('2d');
+        const textDiv = document.getElementById('text-mode');
+        
+        // Set canvas size
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // State
+        const state = {
+            channel: 0,
+            year: 1970,
+            mode: 'CRT',
+            textMode: false,
+            beam: { x: canvas.width/2, y: canvas.height/2, vx: 0, vy: 0 },
+            ghosts: [],
+            phase: 0,
+            halting: false
+        };
+        
+        // Philosophical texts
+        const texts = {
+            flusser: [
+                "Writing is dead. We are post-historical.",
+                "The universe of technical images swallows history.",
+                "Linear writing created history. Now we spiral.",
+                "The screen is not a window but a projection.",
+                "We are no longer subjects but projects."
+            ],
+            user: [
+                "Code is the new literacy.",
+                "Every algorithm contains the halting problem.",
+                "We execute reality through computation.",
+                "The screen is both window and mirror.",
+                "Computational literacy reveals the limits."
+            ],
+            system: [
+                "CHANNEL NOT FOUND",
+                "HALTING PROBLEM DETECTED",
+                "AUDIENCE: NULL",
+                "PHOSPHOR DECAY EXCEEDS REFRESH",
+                "VOID COMPUTES BACK"
+            ]
+        };
+        
+        // Change channel
+        function changeChannel(delta) {
+            state.channel = (state.channel + delta + 1000) % 1000;
+            document.getElementById('channel').textContent = String(state.channel).padStart(3, '0');
+            
+            // Add disturbance
+            for (let i = 0; i < 20; i++) {
+                state.ghosts.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    age: 0,
+                    type: 'channel'
+                });
+            }
+            
+            // Sometimes trigger text mode
+            if (state.channel % 111 === 0 && Math.random() < 0.5) {
+                setTimeout(toggleText, 1000);
+            }
+        }
+        
+        // Time travel
+        function timeTravel(years) {
+            state.year = Math.max(-40000, Math.min(2070, state.year + years));
+            document.getElementById('year').textContent = state.year;
+            
+            // Determine mode
+            if (state.year > 2020) state.mode = 'NEURAL';
+            else if (state.year > 1950) state.mode = 'CRT';
+            else if (state.year > 1890) state.mode = 'CINEMA';
+            else if (state.year > 1840) state.mode = 'PHOTO';
+            else if (state.year > 1450) state.mode = 'PRINT';
+            else if (state.year > 800) state.mode = 'MANUSCRIPT';
+            else state.mode = 'CAVE';
+            
+            document.getElementById('mode').textContent = state.mode;
+        }
+        
+        // Toggle text mode
+        function toggleText() {
+            state.textMode = !state.textMode;
+            if (state.textMode) {
+                textDiv.style.display = 'block';
+                textDiv.innerHTML = '';
+                generateText();
+            } else {
+                textDiv.style.display = 'none';
+            }
+        }
+        
+        // Generate philosophical text
+        function generateText() {
+            if (!state.textMode) return;
+            
+            const type = Math.random();
+            const div = document.createElement('div');
+            
+            if (type < 0.4) {
+                div.className = 'flusser';
+                div.textContent = texts.flusser[Math.floor(Math.random() * texts.flusser.length)];
+            } else if (type < 0.8) {
+                div.className = 'user';
+                div.textContent = texts.user[Math.floor(Math.random() * texts.user.length)];
+            } else {
+                div.className = 'system';
+                div.textContent = texts.system[Math.floor(Math.random() * texts.system.length)];
+            }
+            
+            textDiv.appendChild(div);
+            textDiv.scrollTop = textDiv.scrollHeight;
+            
+            // Continue generating
+            setTimeout(generateText, 1000 + Math.random() * 2000);
+            
+            // Sometimes exit
+            if (Math.random() < 0.05) {
+                setTimeout(toggleText, 5000);
+            }
+        }
+        
+        // Degauss
+        function degauss() {
+            const startTime = Date.now();
+            const degaussEffect = () => {
+                const elapsed = Date.now() - startTime;
+                if (elapsed < 2000) {
+                    ctx.save();
+                    ctx.translate(canvas.width/2, canvas.height/2);
+                    ctx.rotate(Math.sin(elapsed * 0.01) * 0.1);
+                    ctx.scale(1 + Math.sin(elapsed * 0.02) * 0.05, 1 + Math.cos(elapsed * 0.02) * 0.05);
+                    ctx.translate(-canvas.width/2, -canvas.height/2);
+                    ctx.fillStyle = `hsla(${elapsed % 360}, 100%, 50%, 0.1)`;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.restore();
+                    requestAnimationFrame(degaussEffect);
+                }
+            };
+            degaussEffect();
+        }
+        
+        // Main render loop
+        function render() {
+            state.phase += 0.01;
+            
+            // Clear with phosphor persistence
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update beam physics
+            state.beam.vx += (Math.random() - 0.5) * 2 + Math.sin(state.phase) * 3;
+            state.beam.vy += (Math.random() - 0.5) * 2 + Math.cos(state.phase * 1.1) * 3;
+            
+            // Center gravity
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            state.beam.vx += (cx - state.beam.x) * 0.001;
+            state.beam.vy += (cy - state.beam.y) * 0.001;
+            
+            // Damping
+            state.beam.vx *= 0.98;
+            state.beam.vy *= 0.98;
+            state.beam.x += state.beam.vx;
+            state.beam.y += state.beam.vy;
+            
+            // Boundaries
+            if (state.beam.x < 0 || state.beam.x > canvas.width) state.beam.vx = -state.beam.vx;
+            if (state.beam.y < 0 || state.beam.y > canvas.height) state.beam.vy = -state.beam.vy;
+            
+            // Draw based on mode
+            ctx.strokeStyle = state.halting ? '#f80' : '#0f0';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = ctx.strokeStyle;
+            
+            if (state.mode === 'CRT') {
+                // Electron beam
+                ctx.beginPath();
+                ctx.moveTo(state.beam.x, state.beam.y);
+                for (let i = 1; i < 10; i++) {
+                    ctx.lineTo(state.beam.x - state.beam.vx * i * 2, state.beam.y - state.beam.vy * i * 2);
+                }
+                ctx.stroke();
+                
+                // Lissajous pattern based on channel
+                const a = (state.channel % 13) + 1;
+                const b = (state.channel % 7) + 1;
+                ctx.beginPath();
+                for (let t = 0; t < Math.PI * 2; t += 0.01) {
+                    const x = cx + Math.sin(a * t + state.phase) * 150;
+                    const y = cy + Math.sin(b * t) * 150;
+                    if (t === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            } else if (state.mode === 'NEURAL') {
+                // Neural network pattern
+                for (let i = 0; i < 20; i++) {
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 3, 0, Math.PI * 2);
+                    ctx.stroke();
+                    if (Math.random() < 0.3) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(state.beam.x, state.beam.y);
+                        ctx.stroke();
+                    }
+                }
+            } else if (state.mode === 'CAVE') {
+                // Primitive marks
+                ctx.strokeStyle = '#800';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(state.beam.x, state.beam.y);
+                for (let i = 0; i < 5; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = Math.random() * 50;
+                    ctx.lineTo(state.beam.x + Math.cos(angle) * dist, state.beam.y + Math.sin(angle) * dist);
+                }
+                ctx.stroke();
+            }
+            
+            // Draw ghosts
+            state.ghosts.forEach((ghost, i) => {
+                ghost.age++;
+                const opacity = Math.max(0, 1 - ghost.age / 1000);
+                ctx.fillStyle = `rgba(0, 255, 0, ${opacity * 0.3})`;
+                ctx.fillRect(ghost.x - 2, ghost.y - 2, 4, 4);
+                if (ghost.age > 1000) state.ghosts.splice(i, 1);
+            });
+            
+            // Static
+            for (let i = 0; i < 100; i++) {
+                if (Math.random() < 0.1) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1, 1);
+                }
+            }
+            
+            // Special channel effects
+            if (state.channel === 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (state.channel === 404) {
+                ctx.fillStyle = '#f00';
+                ctx.font = '48px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('NOT FOUND', cx, cy);
+            } else if (state.channel === 666) {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            requestAnimationFrame(render);
+        }
+        
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') changeChannel(1);
+            if (e.key === 'ArrowDown') changeChannel(-1);
+            if (e.key === 'ArrowLeft') timeTravel(-10);
+            if (e.key === 'ArrowRight') timeTravel(10);
+            if (e.key === ' ') state.halting = !state.halting;
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!state.textMode) {
+                const dx = e.clientX - state.beam.x;
+                const dy = e.clientY - state.beam.y;
+                const dist = Math.hypot(dx, dy) + 1;
+                state.beam.vx += (dx / dist) * 3;
+                state.beam.vy += (dy / dist) * 3;
+            }
+        });
+        
+        document.addEventListener('wheel', (e) => {
+            changeChannel(e.deltaY > 0 ? -1 : 1);
+        });
+        
+        // Start
+        render();
+        
+        // Random text interruptions
+        setInterval(() => {
+            if (!state.textMode && Math.random() < 0.03) {
+                toggleText();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Eternal Medium</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            cursor: none;
+            font-family: 'Courier New', monospace;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #epoch-indicator {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.8);
+            font-size: 24px;
+            text-shadow: 0 0 10px currentColor;
+            z-index: 100;
+            transition: all 1s;
+        }
+
+        #medium-status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            letter-spacing: 2px;
+            z-index: 100;
+        }
+
+        #time-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+        }
+
+        button {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.6);
+            padding: 10px;
+            margin: 5px;
+            font-family: monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            border-color: rgba(255,255,255,0.8);
+            color: rgba(255,255,255,1);
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .vellum-texture {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(90deg, 
+                    transparent, 
+                    transparent 2px, 
+                    rgba(139,69,19,0.1) 2px, 
+                    rgba(139,69,19,0.1) 4px),
+                repeating-linear-gradient(0deg, 
+                    transparent, 
+                    transparent 2px, 
+                    rgba(139,69,19,0.1) 2px, 
+                    rgba(139,69,19,0.1) 4px);
+            opacity: 0;
+            transition: opacity 2s;
+            pointer-events: none;
+        }
+
+        .daguerreotype-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            height: 60%;
+            border: 20px solid #8B6914;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+            opacity: 0;
+            transition: opacity 2s;
+            pointer-events: none;
+        }
+
+        .neural-web {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, 
+                rgba(0,255,255,0.1) 0%, 
+                transparent 50%);
+            opacity: 0;
+            transition: opacity 2s;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Layer system for different epochs -->
+    <canvas id="substrate"></canvas>
+    <canvas id="inscription"></canvas>
+    <canvas id="ghosts"></canvas>
+    <canvas id="interference"></canvas>
+    <div class="vellum-texture" id="vellum"></div>
+    <div class="daguerreotype-frame" id="daguerreotype"></div>
+    <div class="neural-web" id="neural"></div>
+    
+    <div id="epoch-indicator">1970s :: CATHODE RAY</div>
+    <div id="medium-status">SCANNING ELECTROMAGNETIC SPECTRA</div>
+    
+    <div id="time-controls">
+        <button onclick="timeTravel(-100)">← PAST</button>
+        <button onclick="timeTravel(100)">FUTURE →</button>
+        <button onclick="degauss()">DEGAUSS</button>
+    </div>
+
+    <script>
+        // Canvas contexts
+        const substrateCanvas = document.getElementById('substrate');
+        const inscriptionCanvas = document.getElementById('inscription');
+        const ghostCanvas = document.getElementById('ghosts');
+        const interferenceCanvas = document.getElementById('interference');
+        
+        const subCtx = substrateCanvas.getContext('2d');
+        const insCtx = inscriptionCanvas.getContext('2d');
+        const ghostCtx = ghostCanvas.getContext('2d');
+        const intCtx = interferenceCanvas.getContext('2d');
+
+        // Resize canvases
+        function resizeCanvases() {
+            [substrateCanvas, inscriptionCanvas, ghostCanvas, interferenceCanvas].forEach(canvas => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        }
+        resizeCanvases();
+        window.addEventListener('resize', resizeCanvases);
+
+        // Time state
+        let currentYear = 1970;
+        let epoch = 'crt';
+        let timeVelocity = 0;
+        let inscription = {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
+            vx: 0,
+            vy: 0,
+            memory: [],
+            channel: 0,
+            text: '',
+            neurons: []
+        };
+
+        // Epoch definitions
+        const epochs = {
+            neural: { 
+                start: 2020, 
+                name: 'NEURAL SUBSTRATE',
+                status: 'PROPAGATING THROUGH LATENT SPACE',
+                color: [0, 255, 255],
+                ghostDecay: 0.99
+            },
+            crt: { 
+                start: 1950, 
+                name: 'CATHODE RAY',
+                status: 'SCANNING ELECTROMAGNETIC SPECTRA',
+                color: [0, 255, 0],
+                ghostDecay: 0.985
+            },
+            cinema: { 
+                start: 1890, 
+                name: 'MOVING PICTURES',
+                status: 'PERSISTENCE OF VISION AT 24 FPS',
+                color: [255, 255, 200],
+                ghostDecay: 0.97
+            },
+            photograph: { 
+                start: 1840, 
+                name: 'DAGUERREOTYPE',
+                status: 'SILVER HALIDES CAPTURING LIGHT',
+                color: [139, 69, 19],
+                ghostDecay: 0.95
+            },
+            telegraph: { 
+                start: 1840, 
+                name: 'TELEGRAPH',
+                status: 'DOTS AND DASHES THROUGH COPPER',
+                color: [255, 255, 0],
+                ghostDecay: 0.98
+            },
+            print: { 
+                start: 1450, 
+                name: 'MOVABLE TYPE',
+                status: 'PRESSING LEAD INTO PAPER',
+                color: [0, 0, 0],
+                ghostDecay: 0.93
+            },
+            manuscript: { 
+                start: 800, 
+                name: 'ILLUMINATED MANUSCRIPT',
+                status: 'GOLD LEAF ON VELLUM',
+                color: [255, 215, 0],
+                ghostDecay: 0.91
+            },
+            papyrus: { 
+                start: -3000, 
+                name: 'PAPYRUS SCROLL',
+                status: 'REED MARKS IN RIVER MUD',
+                color: [139, 90, 43],
+                ghostDecay: 0.88
+            },
+            cave: { 
+                start: -40000, 
+                name: 'CAVE WALL',
+                status: 'OCHRE AND CHARCOAL BY FIRELIGHT',
+                color: [139, 0, 0],
+                ghostDecay: 0.85
+            }
+        };
+
+        // Determine epoch from year
+        function getEpoch(year) {
+            for (const [key, epoch] of Object.entries(epochs)) {
+                if (year >= epoch.start) {
+                    return key;
+                }
+            }
+            return 'cave';
+        }
+
+        // Time travel
+        function timeTravel(years) {
+            timeVelocity = years;
+            const oldEpoch = epoch;
+            currentYear += years;
+            
+            // Bounds
+            if (currentYear < -40000) currentYear = -40000;
+            if (currentYear > 2070) currentYear = 2070;
+            
+            epoch = getEpoch(currentYear);
+            
+            // Epoch transition effects
+            if (oldEpoch !== epoch) {
+                transitionEpoch(oldEpoch, epoch);
+            }
+            
+            updateDisplay();
+        }
+
+        // Epoch transitions
+        function transitionEpoch(from, to) {
+            // Hide all overlays
+            document.getElementById('vellum').style.opacity = 0;
+            document.getElementById('daguerreotype').style.opacity = 0;
+            document.getElementById('neural').style.opacity = 0;
+            
+            // Show epoch-specific overlays
+            if (to === 'manuscript' || to === 'papyrus') {
+                document.getElementById('vellum').style.opacity = 0.3;
+            } else if (to === 'photograph') {
+                document.getElementById('daguerreotype').style.opacity = 0.8;
+            } else if (to === 'neural') {
+                document.getElementById('neural').style.opacity = 0.5;
+            }
+            
+            // Create time ripple
+            const ripple = {
+                x: window.innerWidth / 2,
+                y: window.innerHeight / 2,
+                radius: 0,
+                maxRadius: Math.max(window.innerWidth, window.innerHeight),
+                epoch: to
+            };
+            
+            const animateRipple = () => {
+                ripple.radius += 20;
+                if (ripple.radius < ripple.maxRadius) {
+                    intCtx.strokeStyle = `rgba(255,255,255,${1 - ripple.radius / ripple.maxRadius})`;
+                    intCtx.lineWidth = 10;
+                    intCtx.beginPath();
+                    intCtx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+                    intCtx.stroke();
+                    requestAnimationFrame(animateRipple);
+                }
+            };
+            animateRipple();
+            
+            // Add memories of transition
+            for (let i = 0; i < 50; i++) {
+                inscription.memory.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    epoch: from,
+                    time: Date.now(),
+                    char: getEpochChar(from)
+                });
+            }
+        }
+
+        // Get characteristic mark for each epoch
+        function getEpochChar(epochName) {
+            const chars = {
+                neural: '◉',
+                crt: '▓',
+                cinema: '◼',
+                photograph: '□',
+                telegraph: '·',
+                print: '¶',
+                manuscript: '✠',
+                papyrus: '𓂀',
+                cave: '◯'
+            };
+            return chars[epochName] || '•';
+        }
+
+        // Update display
+        function updateDisplay() {
+            const epochData = epochs[epoch];
+            document.getElementById('epoch-indicator').textContent = 
+                `${currentYear}s :: ${epochData.name}`;
+            document.getElementById('medium-status').textContent = epochData.status;
+            
+            // Update colors
+            document.getElementById('epoch-indicator').style.color = 
+                `rgba(${epochData.color.join(',')},0.8)`;
+        }
+
+        // Main inscription loop
+        function inscribe() {
+            const epochData = epochs[epoch];
+            
+            // Clear with epoch-specific persistence
+            subCtx.fillStyle = `rgba(0,0,0,${1 - epochData.ghostDecay})`;
+            subCtx.fillRect(0, 0, substrateCanvas.width, substrateCanvas.height);
+            
+            insCtx.fillStyle = `rgba(0,0,0,0.1)`;
+            insCtx.fillRect(0, 0, inscriptionCanvas.width, inscriptionCanvas.height);
+            
+            // Epoch-specific inscription methods
+            switch(epoch) {
+                case 'neural':
+                    inscribeNeural();
+                    break;
+                case 'crt':
+                    inscribeCRT();
+                    break;
+                case 'cinema':
+                    inscribeCinema();
+                    break;
+                case 'photograph':
+                    inscribePhotograph();
+                    break;
+                case 'telegraph':
+                    inscribeTelegraph();
+                    break;
+                case 'print':
+                    inscribePrint();
+                    break;
+                case 'manuscript':
+                    inscribeManuscript();
+                    break;
+                case 'papyrus':
+                case 'cave':
+                    inscribePrimitive();
+                    break;
+            }
+            
+            // Update ghosts
+            updateGhosts();
+            
+            // Interference patterns
+            updateInterference();
+            
+            requestAnimationFrame(inscribe);
+        }
+
+        // Neural epoch (2020s+)
+        function inscribeNeural() {
+            // Initialize neurons if needed
+            if (inscription.neurons.length === 0) {
+                for (let i = 0; i < 100; i++) {
+                    inscription.neurons.push({
+                        x: Math.random() * window.innerWidth,
+                        y: Math.random() * window.innerHeight,
+                        connections: [],
+                        activation: Math.random()
+                    });
+                }
+                // Create connections
+                inscription.neurons.forEach((neuron, i) => {
+                    for (let j = 0; j < 3; j++) {
+                        neuron.connections.push(Math.floor(Math.random() * inscription.neurons.length));
+                    }
+                });
+            }
+            
+            // Update and draw neural network
+            insCtx.strokeStyle = 'rgba(0,255,255,0.2)';
+            insCtx.lineWidth = 1;
+            
+            inscription.neurons.forEach((neuron, i) => {
+                // Update activation
+                neuron.activation = (neuron.activation + Math.random() * 0.1 - 0.05);
+                if (neuron.activation < 0) neuron.activation = 0;
+                if (neuron.activation > 1) neuron.activation = 1;
+                
+                // Draw connections
+                neuron.connections.forEach(targetIdx => {
+                    const target = inscription.neurons[targetIdx];
+                    if (target && neuron.activation > 0.5) {
+                        insCtx.beginPath();
+                        insCtx.moveTo(neuron.x, neuron.y);
+                        insCtx.lineTo(target.x, target.y);
+                        insCtx.stroke();
+                    }
+                });
+                
+                // Draw neuron
+                insCtx.fillStyle = `rgba(0,255,255,${neuron.activation})`;
+                insCtx.beginPath();
+                insCtx.arc(neuron.x, neuron.y, 3 + neuron.activation * 5, 0, Math.PI * 2);
+                insCtx.fill();
+            });
+            
+            // Propagate signals
+            if (Math.random() < 0.1) {
+                const source = inscription.neurons[Math.floor(Math.random() * inscription.neurons.length)];
+                source.activation = 1;
+            }
+        }
+
+        // CRT epoch (1950s-1990s) 
+        function inscribeCRT() {
+            // Electron beam movement
+            inscription.vx += (Math.random() - 0.5) * 2 + Math.sin(Date.now() * 0.001) * 3;
+            inscription.vy += (Math.random() - 0.5) * 2 + Math.cos(Date.now() * 0.0011) * 3;
+            
+            // Magnetic deflection toward center
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            inscription.vx += (centerX - inscription.x) * 0.001;
+            inscription.vy += (centerY - inscription.y) * 0.001;
+            
+            // Apply velocity with damping
+            inscription.vx *= 0.98;
+            inscription.vy *= 0.98;
+            inscription.x += inscription.vx;
+            inscription.y += inscription.vy;
+            
+            // Boundaries
+            if (inscription.x < 0 || inscription.x > window.innerWidth) inscription.vx = -inscription.vx;
+            if (inscription.y < 0 || inscription.y > window.innerHeight) inscription.vy = -inscription.vy;
+            
+            // Draw beam
+            insCtx.strokeStyle = 'rgba(0,255,0,0.8)';
+            insCtx.lineWidth = 2;
+            insCtx.beginPath();
+            insCtx.moveTo(inscription.x, inscription.y);
+            for (let i = 1; i < 10; i++) {
+                insCtx.lineTo(
+                    inscription.x - inscription.vx * i * 2,
+                    inscription.y - inscription.vy * i * 2
+                );
+            }
+            insCtx.stroke();
+            
+            // Phosphor glow
+            const gradient = insCtx.createRadialGradient(
+                inscription.x, inscription.y, 0,
+                inscription.x, inscription.y, 20
+            );
+            gradient.addColorStop(0, 'rgba(0,255,0,0.5)');
+            gradient.addColorStop(1, 'rgba(0,255,0,0)');
+            insCtx.fillStyle = gradient;
+            insCtx.fillRect(inscription.x - 20, inscription.y - 20, 40, 40);
+        }
+
+        // Cinema epoch (1890s-1940s)
+        function inscribeCinema() {
+            const frame = Math.floor(Date.now() / 42) % 24; // 24fps
+            const sprocketHoles = 4;
+            
+            // Film strip edges
+            insCtx.fillStyle = 'rgba(0,0,0,0.8)';
+            insCtx.fillRect(0, 0, 100, window.innerHeight);
+            insCtx.fillRect(window.innerWidth - 100, 0, 100, window.innerHeight);
+            
+            // Sprocket holes
+            insCtx.fillStyle = 'rgba(255,255,255,0.5)';
+            for (let i = 0; i < window.innerHeight / 50; i++) {
+                insCtx.fillRect(20, i * 50 + frame * 2, 20, 30);
+                insCtx.fillRect(window.innerWidth - 40, i * 50 + frame * 2, 20, 30);
+            }
+            
+            // Flicker effect
+            if (frame % 3 === 0) {
+                insCtx.fillStyle = 'rgba(255,255,200,0.1)';
+                insCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+            }
+            
+            // Moving image
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            insCtx.strokeStyle = 'rgba(255,255,200,0.5)';
+            insCtx.lineWidth = 3;
+            insCtx.beginPath();
+            insCtx.arc(
+                centerX + Math.sin(frame * 0.3) * 100,
+                centerY + Math.cos(frame * 0.3) * 100,
+                50 + Math.sin(frame * 0.1) * 20,
+                0, Math.PI * 2
+            );
+            insCtx.stroke();
+        }
+
+        // Photograph epoch (1840s-1880s)
+        function inscribePhotograph() {
+            // Silver halide grain
+            const imageData = insCtx.createImageData(window.innerWidth, window.innerHeight);
+            const data = imageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const grain = Math.random() < 0.001;
+                if (grain) {
+                    const brightness = Math.random() * 100 + 100;
+                    data[i] = brightness * 0.8;     // Sepia R
+                    data[i + 1] = brightness * 0.6; // Sepia G
+                    data[i + 2] = brightness * 0.4; // Sepia B
+                    data[i + 3] = 255;
+                }
+            }
+            
+            insCtx.putImageData(imageData, 0, 0);
+            
+            // Vignette
+            const gradient = insCtx.createRadialGradient(
+                window.innerWidth / 2, window.innerHeight / 2, 0,
+                window.innerWidth / 2, window.innerHeight / 2, 
+                Math.max(window.innerWidth, window.innerHeight) * 0.7
+            );
+            gradient.addColorStop(0, 'rgba(0,0,0,0)');
+            gradient.addColorStop(1, 'rgba(0,0,0,0.8)');
+            insCtx.fillStyle = gradient;
+            insCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+        }
+
+        // Telegraph epoch (1840s-1920s)
+        function inscribeTelegraph() {
+            inscription.text += Math.random() < 0.1 ? '·' : '-';
+            if (inscription.text.length > 50) inscription.text = inscription.text.slice(-50);
+            
+            insCtx.fillStyle = 'rgba(255,255,0,0.8)';
+            insCtx.font = '20px monospace';
+            insCtx.fillText(inscription.text, 50, window.innerHeight / 2);
+            
+            // Spark gaps
+            if (Math.random() < 0.05) {
+                const sparkX = Math.random() * window.innerWidth;
+                const sparkY = Math.random() * window.innerHeight;
+                insCtx.strokeStyle = 'rgba(255,255,0,1)';
+                insCtx.lineWidth = 2;
+                for (let i = 0; i < 5; i++) {
+                    insCtx.beginPath();
+                    insCtx.moveTo(sparkX, sparkY);
+                    const angle = Math.random() * Math.PI * 2;
+                    const length = Math.random() * 50;
+                    insCtx.lineTo(
+                        sparkX + Math.cos(angle) * length,
+                        sparkY + Math.sin(angle) * length
+                    );
+                    insCtx.stroke();
+                }
+            }
+        }
+
+        // Print epoch (1450s-1850s)
+        function inscribePrint() {
+            insCtx.fillStyle = 'rgba(0,0,0,0.9)';
+            insCtx.font = '16px serif';
+            const text = 'Lorem ipsum dolor sit amet consectetur adipiscing elit ';
+            const lines = 30;
+            const lineHeight = 20;
+            
+            for (let i = 0; i < lines; i++) {
+                const y = 50 + i * lineHeight;
+                const offset = Math.sin(Date.now() * 0.0001 + i) * 2;
+                insCtx.fillText(text.repeat(3), 50 + offset, y);
+            }
+            
+            // Ink bleed
+            if (Math.random() < 0.1) {
+                const bleedX = Math.random() * window.innerWidth;
+                const bleedY = Math.random() * window.innerHeight;
+                const gradient = insCtx.createRadialGradient(
+                    bleedX, bleedY, 0,
+                    bleedX, bleedY, 20
+                );
+                gradient.addColorStop(0, 'rgba(0,0,0,0.5)');
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                insCtx.fillStyle = gradient;
+                insCtx.fillRect(bleedX - 20, bleedY - 20, 40, 40);
+            }
+        }
+
+        // Manuscript epoch (800s-1450s)
+        function inscribeManuscript() {
+            // Illuminated letter
+            const letter = String.fromCharCode(65 + Math.floor(Date.now() / 3000) % 26);
+            insCtx.fillStyle = 'rgba(255,215,0,0.8)';
+            insCtx.font = 'bold 120px serif';
+            insCtx.fillText(letter, 100, 200);
+            
+            // Gold leaf effect
+            insCtx.strokeStyle = 'rgba(255,215,0,0.5)';
+            insCtx.lineWidth = 2;
+            insCtx.strokeText(letter, 100, 200);
+            
+            // Marginalia
+            insCtx.save();
+            insCtx.translate(window.innerWidth - 100, window.innerHeight / 2);
+            insCtx.rotate(Math.PI / 2);
+            insCtx.fillStyle = 'rgba(139,69,19,0.6)';
+            insCtx.font = '12px serif';
+            insCtx.fillText('glossa ordinaria', 0, 0);
+            insCtx.restore();
+            
+            // Decorative vine
+            insCtx.strokeStyle = 'rgba(0,100,0,0.5)';
+            insCtx.lineWidth = 3;
+            insCtx.beginPath();
+            const vineX = 50;
+            for (let y = 0; y < window.innerHeight; y += 20) {
+                insCtx.lineTo(
+                    vineX + Math.sin(y * 0.05) * 20,
+                    y
+                );
+            }
+            insCtx.stroke();
+        }
+
+        // Primitive epochs (papyrus/cave)
+        function inscribePrimitive() {
+            inscription.x += (Math.random() - 0.5) * 10;
+            inscription.y += (Math.random() - 0.5) * 10;
+            
+            if (inscription.x < 100) inscription.x = 100;
+            if (inscription.x > window.innerWidth - 100) inscription.x = window.innerWidth - 100;
+            if (inscription.y < 100) inscription.y = 100;
+            if (inscription.y > window.innerHeight - 100) inscription.y = window.innerHeight - 100;
+            
+            // Hand movements
+            insCtx.strokeStyle = epoch === 'cave' ? 
+                'rgba(139,0,0,0.8)' : 'rgba(139,90,43,0.8)';
+            insCtx.lineWidth = 5;
+            insCtx.lineCap = 'round';
+            insCtx.beginPath();
+            insCtx.moveTo(inscription.x, inscription.y);
+            
+            for (let i = 0; i < 5; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 30;
+                insCtx.lineTo(
+                    inscription.x + Math.cos(angle) * distance,
+                    inscription.y + Math.sin(angle) * distance
+                );
+            }
+            insCtx.stroke();
+            
+            // Occasional figure
+            if (Math.random() < 0.02) {
+                insCtx.beginPath();
+                insCtx.arc(inscription.x, inscription.y - 20, 10, 0, Math.PI * 2);
+                insCtx.moveTo(inscription.x, inscription.y - 10);
+                insCtx.lineTo(inscription.x, inscription.y + 20);
+                insCtx.moveTo(inscription.x - 15, inscription.y);
+                insCtx.lineTo(inscription.x + 15, inscription.y);
+                insCtx.moveTo(inscription.x, inscription.y + 20);
+                insCtx.lineTo(inscription.x - 10, inscription.y + 40);
+                insCtx.moveTo(inscription.x, inscription.y + 20);
+                insCtx.lineTo(inscription.x + 10, inscription.y + 40);
+                insCtx.stroke();
+            }
+        }
+
+        // Update ghosts
+        function updateGhosts() {
+            ghostCtx.fillStyle = 'rgba(0,0,0,0.02)';
+            ghostCtx.fillRect(0, 0, ghostCanvas.width, ghostCanvas.height);
+            
+            // Draw inscription ghosts
+            inscription.memory.forEach((memory, idx) => {
+                const age = Date.now() - memory.time;
+                const opacity = Math.max(0, 1 - age / 60000);
+                const epochData = epochs[memory.epoch] || epochs.cave;
+                
+                ghostCtx.fillStyle = `rgba(${epochData.color.join(',')},${opacity * 0.3})`;
+                ghostCtx.font = '20px monospace';
+                ghostCtx.fillText(memory.char || '•', memory.x, memory.y);
+            });
+            
+            // Limit memory
+            if (inscription.memory.length > 1000) {
+                inscription.memory = inscription.memory.slice(-1000);
+            }
+            
+            // Add current position to memory occasionally
+            if (Math.random() < 0.1) {
+                inscription.memory.push({
+                    x: inscription.x,
+                    y: inscription.y,
+                    epoch: epoch,
+                    time: Date.now(),
+                    char: getEpochChar(epoch)
+                });
+            }
+        }
+
+        // Update interference
+        function updateInterference() {
+            intCtx.fillStyle = 'rgba(0,0,0,0.1)';
+            intCtx.fillRect(0, 0, interferenceCanvas.width, interferenceCanvas.height);
+            
+            // Time distortion waves
+            if (Math.abs(timeVelocity) > 0) {
+                intCtx.strokeStyle = `rgba(255,255,255,${Math.abs(timeVelocity) / 1000})`;
+                intCtx.lineWidth = 2;
+                const waveY = (Date.now() * Math.abs(timeVelocity) * 0.1) % interferenceCanvas.height;
+                intCtx.beginPath();
+                for (let x = 0; x < interferenceCanvas.width; x += 10) {
+                    intCtx.lineTo(x, waveY + Math.sin(x * 0.05) * 20);
+                }
+                intCtx.stroke();
+                
+                timeVelocity *= 0.95;
+            }
+        }
+
+        // Degauss function works across all epochs
+        function degauss() {
+            const duration = 2000;
+            const startTime = Date.now();
+            
+            const degaussAnimation = () => {
+                const elapsed = Date.now() - startTime;
+                const progress = elapsed / duration;
+                
+                if (progress < 1) {
+                    // Universal degauss effect
+                    intCtx.save();
+                    intCtx.translate(window.innerWidth / 2, window.innerHeight / 2);
+                    intCtx.rotate(Math.sin(progress * Math.PI * 10) * 0.1);
+                    intCtx.scale(
+                        1 + Math.sin(progress * Math.PI * 20) * 0.05,
+                        1 + Math.cos(progress * Math.PI * 20) * 0.05
+                    );
+                    intCtx.translate(-window.innerWidth / 2, -window.innerHeight / 2);
+                    
+                    intCtx.fillStyle = `hsla(${progress * 360}, 100%, 50%, ${0.1 * (1 - progress)})`;
+                    intCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+                    intCtx.restore();
+                    
+                    requestAnimationFrame(degaussAnimation);
+                } else {
+                    // Clear some memories
+                    inscription.memory = inscription.memory.slice(-100);
+                    ghostCtx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ghostCtx.fillRect(0, 0, ghostCanvas.width, ghostCanvas.height);
+                }
+            };
+            
+            degaussAnimation();
+        }
+
+        // Mouse movement creates epoch-appropriate disturbances
+        document.addEventListener('mousemove', (e) => {
+            if (epoch === 'neural') {
+                // Activate nearby neurons
+                inscription.neurons.forEach(neuron => {
+                    const dist = Math.hypot(neuron.x - e.clientX, neuron.y - e.clientY);
+                    if (dist < 100) {
+                        neuron.activation = Math.min(1, neuron.activation + 0.1);
+                    }
+                });
+            } else if (epoch === 'crt') {
+                // Magnetic deflection
+                const dx = e.clientX - inscription.x;
+                const dy = e.clientY - inscription.y;
+                const dist = Math.hypot(dx, dy) + 1;
+                inscription.vx += (dx / dist) * 5;
+                inscription.vy += (dy / dist) * 5;
+            }
+        });
+
+        // Keyboard time travel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') timeTravel(-10);
+            if (e.key === 'ArrowRight') timeTravel(10);
+            if (e.shiftKey && e.key === 'ArrowLeft') timeTravel(-100);
+            if (e.shiftKey && e.key === 'ArrowRight') timeTravel(100);
+        });
+
+        // Initialize
+        updateDisplay();
+        inscribe();
+    </script>
+</body>
+</html>

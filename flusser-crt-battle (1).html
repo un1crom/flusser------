@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inside the CRT: Flusser vs Computational Literacy</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        #crt-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(ellipse at center, #001a00 0%, #000 100%);
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1; }
+            100% { opacity: 0.98; }
+        }
+
+        #phosphor-grid {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                repeating-linear-gradient(0deg, rgba(0,255,0,0.03) 0px, transparent 1px, transparent 2px, rgba(0,255,0,0.03) 3px),
+                repeating-linear-gradient(90deg, rgba(0,255,0,0.03) 0px, transparent 1px, transparent 2px, rgba(0,255,0,0.03) 3px);
+            pointer-events: none;
+        }
+
+        .electron-beam {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #0f0;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #0f0, 0 0 20px #0f0, 0 0 40px #0f0;
+            pointer-events: none;
+        }
+
+        .philosopher {
+            position: absolute;
+            width: 150px;
+            height: 200px;
+            transition: all 0.3s ease;
+        }
+
+        #flusser {
+            left: 20%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #user {
+            right: 20%;
+            top: 50%;
+            transform: translate(50%, -50%);
+        }
+
+        .philosopher-avatar {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 10px;
+            border: 2px solid #0f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            background: rgba(0,255,0,0.1);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px #0f0; }
+            50% { box-shadow: 0 0 40px #0f0, 0 0 60px #0f0; }
+        }
+
+        .dialogue {
+            position: absolute;
+            top: -120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            padding: 15px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.5s;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .dialogue.active {
+            opacity: 1;
+        }
+
+        #battle-arena {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 300px;
+            border: 2px solid #0f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle, transparent 30%, rgba(0,255,0,0.1) 70%);
+        }
+
+        #concept-particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .concept {
+            position: absolute;
+            padding: 5px 10px;
+            background: rgba(0,255,0,0.2);
+            border: 1px solid #0f0;
+            border-radius: 20px;
+            font-size: 12px;
+            animation: float 10s infinite linear;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        @keyframes float {
+            from { transform: translateY(100vh) rotate(0deg); }
+            to { transform: translateY(-100px) rotate(360deg); }
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: rgba(0,255,0,0.2);
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        #audience-meter {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+        }
+
+        .scanline {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, rgba(0,255,0,0.5), transparent);
+            animation: scan 8s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan {
+            0% { top: -2px; }
+            100% { top: 100%; }
+        }
+
+        #philosophical-score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 18px;
+        }
+
+        .idea-collision {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border: 2px solid #0f0;
+            border-radius: 50%;
+            animation: explode 1s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes explode {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="crt-container">
+        <div id="phosphor-grid"></div>
+        <div class="scanline"></div>
+        
+        <div id="philosophical-score">
+            <div>SIGNAL STRENGTH: <span id="signal">100%</span></div>
+            <div>COMPUTATIONAL LITERACY: <span id="comp-lit">0</span></div>
+        </div>
+
+        <div id="audience-meter">
+            <div>AUDIENCE: <span id="audience">UNKNOWN</span></div>
+            <div>BROADCASTING TO: <span id="broadcast">VOID</span></div>
+        </div>
+
+        <div id="battle-arena"></div>
+
+        <div id="flusser" class="philosopher">
+            <div class="philosopher-avatar">📺</div>
+            <div>FLUSSER</div>
+            <div class="dialogue" id="flusser-dialogue"></div>
+        </div>
+
+        <div id="user" class="philosopher">
+            <div class="philosopher-avatar">💻</div>
+            <div>YOU</div>
+            <div class="dialogue" id="user-dialogue"></div>
+        </div>
+
+        <div id="concept-particles"></div>
+
+        <div id="controls">
+            <button onclick="debate()">ENGAGE DIALECTIC</button>
+            <button onclick="broadcast()">BROADCAST TO VOID</button>
+            <button onclick="computeLiteracy()">COMPUTE REALITY</button>
+        </div>
+    </div>
+
+    <script>
+        // Philosophical dialogues
+        const flusserQuotes = [
+            "Writing is dead. Television is dying. We are post-historical.",
+            "The universe of technical images is about to swallow history.",
+            "We must learn to read the new codes, or be consumed by them.",
+            "Linear writing created history. Now we return to the magical.",
+            "The screen is not a window but a projective plane.",
+            "Communication is about creating consensus in the face of entropy.",
+            "We are no longer subjects observing objects, but projects in fields.",
+            "Technical images are not copies but models, projections of concepts."
+        ];
+
+        const userQuotes = [
+            "Code is the new literacy. Computation is thought made manifest.",
+            "Every algorithm contains the halting problem. Irreducibility is everywhere.",
+            "We don't just read code, we execute reality through it.",
+            "The screen is both window and mirror - recursion all the way down.",
+            "Computational literacy means understanding the limits of computation.",
+            "We are not post-historical, we are trans-computational.",
+            "The void computes back. Every broadcast is also reception.",
+            "Between your images and my algorithms lies a new synthesis."
+        ];
+
+        const concepts = [
+            "RECURSION", "ENTROPY", "SIGNAL", "VOID", "CODE", "IMAGE",
+            "LITERACY", "BROADCAST", "EXECUTE", "HALT", "PROJECT", "FIELD",
+            "CONSENSUS", "MAGICAL", "LINEAR", "CIRCULAR", "SPIRAL"
+        ];
+
+        let signal = 100;
+        let compLit = 0;
+        let audienceExists = false;
+        let dialogueIndex = 0;
+
+        // Electron beam effect
+        function createElectronBeam() {
+            const beam = document.createElement('div');
+            beam.className = 'electron-beam';
+            beam.style.left = Math.random() * window.innerWidth + 'px';
+            beam.style.top = Math.random() * window.innerHeight + 'px';
+            document.getElementById('crt-container').appendChild(beam);
+            
+            let vx = (Math.random() - 0.5) * 10;
+            let vy = (Math.random() - 0.5) * 10;
+            
+            const animate = () => {
+                let x = parseFloat(beam.style.left);
+                let y = parseFloat(beam.style.top);
+                
+                x += vx;
+                y += vy;
+                
+                if (x < 0 || x > window.innerWidth) vx = -vx;
+                if (y < 0 || y > window.innerHeight) vy = -vy;
+                
+                beam.style.left = x + 'px';
+                beam.style.top = y + 'px';
+                
+                requestAnimationFrame(animate);
+            };
+            
+            animate();
+            setTimeout(() => beam.remove(), 3000);
+        }
+
+        // Create electron beams periodically
+        setInterval(createElectronBeam, 200);
+
+        // Floating concepts
+        function createConcept() {
+            const concept = document.createElement('div');
+            concept.className = 'concept';
+            concept.textContent = concepts[Math.floor(Math.random() * concepts.length)];
+            concept.style.left = Math.random() * window.innerWidth + 'px';
+            concept.onclick = () => {
+                compLit += 5;
+                updateScore();
+                concept.remove();
+                createCollision(concept.offsetLeft, concept.offsetTop);
+            };
+            document.getElementById('concept-particles').appendChild(concept);
+            setTimeout(() => concept.remove(), 10000);
+        }
+
+        setInterval(createConcept, 2000);
+
+        // Philosophical debate
+        function debate() {
+            const flusserD = document.getElementById('flusser-dialogue');
+            const userD = document.getElementById('user-dialogue');
+            
+            flusserD.textContent = flusserQuotes[dialogueIndex % flusserQuotes.length];
+            flusserD.classList.add('active');
+            
+            setTimeout(() => {
+                userD.textContent = userQuotes[dialogueIndex % userQuotes.length];
+                userD.classList.add('active');
+                dialogueIndex++;
+                
+                signal -= 5;
+                compLit += 10;
+                updateScore();
+                
+                // Create collision effect in the arena
+                createCollision(window.innerWidth / 2, window.innerHeight / 2);
+            }, 1500);
+            
+            setTimeout(() => {
+                flusserD.classList.remove('active');
+                userD.classList.remove('active');
+            }, 5000);
+        }
+
+        // Broadcast to void
+        function broadcast() {
+            audienceExists = Math.random() > 0.7;
+            document.getElementById('audience').textContent = audienceExists ? 'DETECTED' : 'ABSENT';
+            document.getElementById('broadcast').textContent = audienceExists ? 'REALITY' : 'VOID';
+            
+            if (!audienceExists) {
+                signal += 10;
+                updateScore();
+            }
+            
+            // Visual feedback
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => createElectronBeam(), i * 50);
+            }
+        }
+
+        // Compute literacy
+        function computeLiteracy() {
+            const arena = document.getElementById('battle-arena');
+            arena.style.animation = 'pulse 1s';
+            setTimeout(() => arena.style.animation = '', 1000);
+            
+            compLit += 15;
+            signal = Math.max(0, signal - 10);
+            updateScore();
+            
+            // Halting problem visualization
+            if (Math.random() > 0.5) {
+                alert("HALT: Computational irreducibility encountered. The universe resists complete calculation.");
+            }
+        }
+
+        // Update scores
+        function updateScore() {
+            document.getElementById('signal').textContent = signal + '%';
+            document.getElementById('comp-lit').textContent = compLit;
+            
+            if (signal <= 0) {
+                document.body.style.animation = 'flicker 0.05s infinite';
+            }
+            
+            if (compLit >= 100) {
+                document.body.style.background = 'radial-gradient(ellipse at center, #003300 0%, #000 100%)';
+            }
+        }
+
+        // Create collision effect
+        function createCollision(x, y) {
+            const collision = document.createElement('div');
+            collision.className = 'idea-collision';
+            collision.style.left = x - 50 + 'px';
+            collision.style.top = y - 50 + 'px';
+            document.getElementById('crt-container').appendChild(collision);
+            setTimeout(() => collision.remove(), 1000);
+        }
+
+        // Initialize
+        debate();
+    </script>
+</body>
+</html>

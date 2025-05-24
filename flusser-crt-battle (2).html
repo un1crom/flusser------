@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Channel ∞: The Haunted Tube</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            cursor: none;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #degauss-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.4);
+            padding: 10px;
+            font-family: monospace;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        #degauss-button:hover {
+            border-color: rgba(255,255,255,0.8);
+            color: rgba(255,255,255,0.8);
+        }
+
+        .channel-switch {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                transparent 0%,
+                rgba(255,255,255,0.8) 45%,
+                rgba(255,255,255,1) 50%,
+                rgba(255,255,255,0.8) 55%,
+                transparent 100%
+            );
+            transform: translateY(-100%);
+            animation: vsync-tear 0.3s linear;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        @keyframes vsync-tear {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        #static-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        #channel-indicator {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(0,255,0,0.8);
+            font-family: monospace;
+            font-size: 24px;
+            text-shadow: 0 0 10px currentColor;
+            z-index: 100;
+        }
+
+        #signal-status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.3);
+            font-family: monospace;
+            font-size: 10px;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="burn-layer"></canvas>
+    <canvas id="ghost-layer"></canvas>
+    <canvas id="phosphor-layer"></canvas>
+    <canvas id="static-overlay"></canvas>
+    <canvas id="interference"></canvas>
+    
+    <div id="channel-indicator">CH ?̸̰͋?̵̬̈</div>
+    <button id="degauss-button" onclick="degauss()">DEGAUSS</button>
+    <div id="signal-status">NO SIGNAL</div>
+
+    <script>
+        // Canvas setup
+        const burnCanvas = document.getElementById('burn-layer');
+        const ghostCanvas = document.getElementById('ghost-layer');
+        const phosphorCanvas = document.getElementById('phosphor-layer');
+        const staticCanvas = document.getElementById('static-overlay');
+        const interferenceCanvas = document.getElementById('interference');
+        
+        const burnCtx = burnCanvas.getContext('2d');
+        const ghostCtx = ghostCanvas.getContext('2d');
+        const phosphorCtx = phosphorCanvas.getContext('2d');
+        const staticCtx = staticCanvas.getContext('2d');
+        const interferenceCtx = interferenceCanvas.getContext('2d');
+
+        // Resize all canvases
+        function resizeCanvases() {
+            const canvases = [burnCanvas, ghostCanvas, phosphorCanvas, staticCanvas, interferenceCanvas];
+            canvases.forEach(canvas => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+            initializeBurnIn();
+        }
+        resizeCanvases();
+        window.addEventListener('resize', resizeCanvases);
+
+        // The channel state
+        let currentChannel = Math.floor(Math.random() * 999);
+        let channelStability = 0;
+        let ghostStrength = 1;
+        let verticalHold = 0;
+        let horizontalHold = 0;
+        let channelMemory = [];
+        let tuning = false;
+        let signal = {
+            strength: Math.random(),
+            frequency: 0,
+            phase: 0,
+            ghosting: 0.5,
+            noise: 0.3
+        };
+
+        // Permanent burn-in patterns
+        const burnPatterns = [];
+        function initializeBurnIn() {
+            burnCtx.fillStyle = 'rgba(0,0,0,1)';
+            burnCtx.fillRect(0, 0, burnCanvas.width, burnCanvas.height);
+            
+            // Test pattern burns
+            const centerX = burnCanvas.width / 2;
+            const centerY = burnCanvas.height / 2;
+            
+            // Circular test pattern burn
+            burnCtx.strokeStyle = 'rgba(255,255,255,0.02)';
+            burnCtx.lineWidth = 20;
+            for (let r = 50; r < 300; r += 50) {
+                burnCtx.beginPath();
+                burnCtx.arc(centerX, centerY, r, 0, Math.PI * 2);
+                burnCtx.stroke();
+            }
+            
+            // Grid burn from computational overuse
+            for (let x = 0; x < burnCanvas.width; x += 32) {
+                burnCtx.strokeStyle = 'rgba(0,255,0,0.01)';
+                burnCtx.beginPath();
+                burnCtx.moveTo(x, 0);
+                burnCtx.lineTo(x, burnCanvas.height);
+                burnCtx.stroke();
+            }
+            
+            // News ticker burn at bottom
+            burnCtx.fillStyle = 'rgba(255,255,255,0.03)';
+            burnCtx.fillRect(0, burnCanvas.height - 100, burnCanvas.width, 50);
+        }
+
+        // Ghost image accumulation
+        function updateGhosts() {
+            ghostCtx.fillStyle = 'rgba(0,0,0,0.02)';
+            ghostCtx.fillRect(0, 0, ghostCanvas.width, ghostCanvas.height);
+            
+            // Add current phosphor state to ghost with offset
+            ghostCtx.globalAlpha = ghostStrength * 0.1;
+            ghostCtx.drawImage(phosphorCanvas, 
+                Math.sin(Date.now() * 0.0001) * 5, 
+                Math.cos(Date.now() * 0.0001) * 3
+            );
+            ghostCtx.globalAlpha = 1;
+            
+            // Channel memory echoes
+            channelMemory.forEach((memory, index) => {
+                const age = Date.now() - memory.time;
+                const opacity = Math.max(0, 1 - age / 30000) * 0.3;
+                ghostCtx.fillStyle = `rgba(${memory.r},${memory.g},${memory.b},${opacity})`;
+                ghostCtx.fillRect(memory.x - 2, memory.y - 2, 4, 4);
+            });
+        }
+
+        // Static generation
+        function generateStatic() {
+            const imageData = staticCtx.createImageData(staticCanvas.width, staticCanvas.height);
+            const data = imageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const noise = Math.random() * signal.noise * 255;
+                data[i] = noise;
+                data[i + 1] = noise;
+                data[i + 2] = noise;
+                data[i + 3] = noise;
+            }
+            
+            staticCtx.putImageData(imageData, 0, 0);
+        }
+
+        // Interference patterns
+        function drawInterference() {
+            interferenceCtx.clearRect(0, 0, interferenceCanvas.width, interferenceCanvas.height);
+            
+            // Rolling horizontal bands
+            const bandCount = 3 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < bandCount; i++) {
+                const y = (Date.now() * 0.1 * (i + 1) + i * 100) % interferenceCanvas.height;
+                const gradient = interferenceCtx.createLinearGradient(0, y - 50, 0, y + 50);
+                gradient.addColorStop(0, 'rgba(255,255,255,0)');
+                gradient.addColorStop(0.5, `rgba(255,255,255,${0.1 * signal.ghosting})`);
+                gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                interferenceCtx.fillStyle = gradient;
+                interferenceCtx.fillRect(0, y - 50, interferenceCanvas.width, 100);
+            }
+            
+            // Diagonal interference
+            interferenceCtx.strokeStyle = `rgba(255,0,255,${0.05 * signal.ghosting})`;
+            interferenceCtx.lineWidth = 2;
+            for (let x = -interferenceCanvas.height; x < interferenceCanvas.width; x += 20) {
+                interferenceCtx.beginPath();
+                interferenceCtx.moveTo(x, 0);
+                interferenceCtx.lineTo(x + interferenceCanvas.height, interferenceCanvas.height);
+                interferenceCtx.stroke();
+            }
+        }
+
+        // Channel switching
+        function changeChannel(direction) {
+            tuning = true;
+            const oldChannel = currentChannel;
+            currentChannel += direction;
+            if (currentChannel < 0) currentChannel = 999;
+            if (currentChannel > 999) currentChannel = 0;
+            
+            // Create vsync tear effect
+            const tear = document.createElement('div');
+            tear.className = 'channel-switch';
+            document.body.appendChild(tear);
+            setTimeout(() => tear.remove(), 300);
+            
+            // Channel change creates massive electromagnetic disturbance
+            signal.noise = 1;
+            signal.ghosting = 1;
+            channelStability = 0;
+            
+            // Log to channel memory
+            for (let i = 0; i < 100; i++) {
+                channelMemory.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    r: Math.random() * 255,
+                    g: Math.random() * 255,
+                    b: Math.random() * 255,
+                    time: Date.now(),
+                    channel: oldChannel
+                });
+            }
+            
+            // Limit memory
+            if (channelMemory.length > 1000) {
+                channelMemory = channelMemory.slice(-1000);
+            }
+            
+            // Update display
+            document.getElementById('channel-indicator').textContent = 
+                `CH ${String(currentChannel).padStart(3, '0').split('').join('̸')}`;
+            
+            setTimeout(() => {
+                tuning = false;
+                signal.noise = 0.3;
+                signal.ghosting = 0.5;
+            }, 1000);
+        }
+
+        // Degaussing
+        function degauss() {
+            const duration = 2000;
+            const startTime = Date.now();
+            
+            const degaussAnimation = () => {
+                const elapsed = Date.now() - startTime;
+                const progress = elapsed / duration;
+                
+                if (progress < 1) {
+                    // Warping effect
+                    phosphorCtx.save();
+                    phosphorCtx.translate(window.innerWidth / 2, window.innerHeight / 2);
+                    phosphorCtx.rotate(Math.sin(progress * Math.PI * 10) * 0.1);
+                    phosphorCtx.scale(
+                        1 + Math.sin(progress * Math.PI * 20) * 0.05,
+                        1 + Math.cos(progress * Math.PI * 20) * 0.05
+                    );
+                    phosphorCtx.translate(-window.innerWidth / 2, -window.innerHeight / 2);
+                    
+                    // Rainbow effect
+                    phosphorCtx.fillStyle = `hsla(${progress * 360}, 100%, 50%, ${0.1 * (1 - progress)})`;
+                    phosphorCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+                    phosphorCtx.restore();
+                    
+                    requestAnimationFrame(degaussAnimation);
+                } else {
+                    // Clear some ghosts
+                    ghostStrength *= 0.5;
+                    ghostCtx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ghostCtx.fillRect(0, 0, ghostCanvas.width, ghostCanvas.height);
+                }
+            };
+            
+            degaussAnimation();
+        }
+
+        // Main scanning loop
+        function scan() {
+            signal.phase += 0.01;
+            
+            // Update signal based on channel
+            if (currentChannel === 0) {
+                signal.strength = 0; // Dead channel
+            } else if (currentChannel === 666) {
+                signal.strength = 1;
+                signal.noise = 0.8; // Hell channel
+            } else if (currentChannel % 111 === 0) {
+                signal.strength = Math.sin(signal.phase) * 0.5 + 0.5; // Oscillating channels
+            } else {
+                signal.strength = Math.min(1, signal.strength + (Math.random() - 0.5) * 0.1);
+            }
+            
+            // Clear phosphor layer
+            phosphorCtx.fillStyle = 'rgba(0,0,0,0.1)';
+            phosphorCtx.fillRect(0, 0, phosphorCanvas.width, phosphorCanvas.height);
+            
+            // Draw based on channel content
+            if (signal.strength > 0.1) {
+                // Lissajous patterns - the signature of each channel
+                const centerX = phosphorCanvas.width / 2 + horizontalHold;
+                const centerY = phosphorCanvas.height / 2 + verticalHold;
+                const a = currentChannel % 13 + 1;
+                const b = currentChannel % 7 + 1;
+                const delta = (currentChannel % 17) * Math.PI / 17;
+                
+                phosphorCtx.strokeStyle = `rgba(0,${255 * signal.strength},${128 * signal.strength},${signal.strength})`;
+                phosphorCtx.lineWidth = 2;
+                phosphorCtx.beginPath();
+                
+                for (let t = 0; t < Math.PI * 2; t += 0.01) {
+                    const x = centerX + Math.sin(a * t + delta) * 200 * signal.strength;
+                    const y = centerY + Math.sin(b * t) * 200 * signal.strength;
+                    if (t === 0) {
+                        phosphorCtx.moveTo(x, y);
+                    } else {
+                        phosphorCtx.lineTo(x, y);
+                    }
+                    
+                    // Occasionally burn bright spots
+                    if (Math.random() < 0.001) {
+                        channelMemory.push({
+                            x: x,
+                            y: y,
+                            r: 0,
+                            g: 255 * signal.strength,
+                            b: 128 * signal.strength,
+                            time: Date.now(),
+                            channel: currentChannel
+                        });
+                    }
+                }
+                phosphorCtx.stroke();
+                
+                // Channel-specific content
+                if (currentChannel === 404) {
+                    phosphorCtx.fillStyle = 'rgba(255,0,0,0.5)';
+                    phosphorCtx.font = '48px monospace';
+                    phosphorCtx.fillText('CHANNEL NOT FOUND', centerX - 200, centerY);
+                } else if (currentChannel === 42) {
+                    // The answer
+                    phosphorCtx.fillStyle = 'rgba(255,255,255,0.8)';
+                    phosphorCtx.font = '72px monospace';
+                    phosphorCtx.fillText('*', centerX - 20, centerY + 20);
+                }
+            }
+            
+            // Update other layers
+            updateGhosts();
+            if (Date.now() % 3 === 0) generateStatic();
+            drawInterference();
+            
+            // Sync issues
+            if (Math.random() < 0.01) {
+                verticalHold += (Math.random() - 0.5) * 50;
+                horizontalHold += (Math.random() - 0.5) * 50;
+            }
+            verticalHold *= 0.95;
+            horizontalHold *= 0.95;
+            
+            // Update status
+            const status = document.getElementById('signal-status');
+            if (signal.strength === 0) {
+                status.textContent = 'NO SIGNAL';
+            } else if (tuning) {
+                status.textContent = 'TUNING...';
+            } else {
+                status.textContent = `SIGNAL: ${Math.floor(signal.strength * 100)}% | GHOST: ${Math.floor(signal.ghosting * 100)}% | MEMORY: ${channelMemory.length}`;
+            }
+            
+            requestAnimationFrame(scan);
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') changeChannel(1);
+            if (e.key === 'ArrowDown') changeChannel(-1);
+            if (e.key === ' ') changeChannel(Math.floor(Math.random() * 100 - 50));
+        });
+
+        // Mouse wheel tuning
+        document.addEventListener('wheel', (e) => {
+            changeChannel(e.deltaY > 0 ? -1 : 1);
+        });
+
+        // Initialize
+        initializeBurnIn();
+        scan();
+        
+        // Occasional automatic interference
+        setInterval(() => {
+            if (Math.random() < 0.3) {
+                signal.ghosting = Math.min(1, signal.ghosting + Math.random() * 0.3);
+                ghostStrength = Math.min(2, ghostStrength + 0.1);
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
